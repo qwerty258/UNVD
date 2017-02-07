@@ -23,7 +23,7 @@ int main(int argc, char* argv[])
 
         uint8_t* pBuffer = malloc(1920 * 1080 * 3 / 2);
         size_t BytesWritten;
-        bool ret = UNVD_GetSnapshot(
+        bool ret = UNVD_GetSnapshotData(
             LoginHandle,
             0,
             pBuffer,

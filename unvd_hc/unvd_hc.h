@@ -19,7 +19,7 @@ UNVDAPI bool UNVD_GetVideoSourceCount(
     IN_PARAM UNVD_LoginHandle LoginHandle,
     OUT_PARAM size_t* pCount);
 
-UNVDAPI bool UNVD_GetSnapshot(
+UNVDAPI bool UNVD_GetSnapshotData(
     IN_PARAM UNVD_LoginHandle LoginHandle,
     IN_PARAM size_t Channel,
     OUT_PARAM uint8_t* pJEPGBuffer,
