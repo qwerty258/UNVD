@@ -1,12 +1,18 @@
 #ifndef INCLUDE_UNVDDEF_H_
 #define INCLUDE_UNVDDEF_H_
 
-#ifdef UNVD_DLL_EXPORT
 #ifdef __cplusplus
-#define UNVDAPI extern "C" __declspec(dllexport)
+  #ifdef UNVD_DLL_EXPORT
+    #define UNVDAPI extern "C" __declspec(dllexport)
+  #else
+    #define UNVDAPI extern "C"
+  #endif
 #else
-#define UNVDAPI __declspec(dllexport)
-#endif
+  #ifdef UNVD_DLL_EXPORT
+    #define UNVDAPI __declspec(dllexport)
+  #else
+    #define UNVDAPI
+  #endif
 #endif
 
 #define IN_PARAM
