@@ -57,7 +57,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>E:\SourceCode\SecuSoft\3rd\dhSDK\General_NetSDK_Eng_Win32_IS_V3.45.0.R.160401\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>dhnetsdk.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>dhnetsdk.lib;dhconfigsdk.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -76,7 +76,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>E:\SourceCode\SecuSoft\3rd\dhSDK\General_NetSDK_Eng_Win32_IS_V3.45.0.R.160401\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>dhnetsdk.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>dhnetsdk.lib;dhconfigsdk.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

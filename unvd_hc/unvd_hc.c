@@ -119,7 +119,7 @@ UNVDAPI bool UNVD_Login(
         pDeviceContext->pHikCompressioncfgAbilityArray = malloc(pDeviceContext->AnalogCamerasCount * sizeof(NET_DVR_COMPRESSIONCFG_ABILITY));
         if (NULL == pDeviceContext->pHikCompressioncfgAbilityArray)
         {
-            free(pDeviceContext);
+            UNVD_Logout(&pDeviceContext);
             return false;
         }
     }
