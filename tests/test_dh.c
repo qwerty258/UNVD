@@ -9,7 +9,7 @@ int main(int argc, char* argv[])
     UNVD_LoginInfo LoginInfo;
     UNVD_LoginHandle LoginHandle;
 
-    LoginInfo.szDeviceAddress = "222.46.27.30";
+    LoginInfo.szDeviceAddress = "192.168.2.108";
     LoginInfo.port = 37777;
     LoginInfo.szUsername = "admin";
     LoginInfo.szPassword = "admin";
@@ -55,6 +55,5 @@ int main(int argc, char* argv[])
 
     ret = UNVD_CleanUp();
 
-    system("pause");
     return 0;
 }

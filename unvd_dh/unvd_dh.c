@@ -508,7 +508,6 @@ UNVDAPI bool UNVD_GetSnapshotData(
 #else
         pthread_mutex_init(&temp, NULL);
         pthread_mutex_lock(&temp);
-        struct timespec weakuptime;
         timespec_get(&weakuptime, TIME_UTC);
         weakuptime.tv_sec += 1;
 #endif
