@@ -7,177 +7,136 @@
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 #if (defined _WIN32 || defined _WIN64)
-#include <Windows.h>
-CRITICAL_SECTION CriticalSectionForSnapJobLinkList;
-typedef struct _SnapJobLinkListElement SnapJobLinkListElement;
-typedef struct _SnapJobLinkListElement
-{
-	SnapJobLinkListElement* pNext;
-	HANDLE hEvent;
-	uint8_t* pJEPGBuffer;
-	size_t BufferSize;
-	size_t* pSizeWritten;
-	DWORD CmdSerial;
-} SnapJobLinkListElement;
-SnapJobLinkListElement* pSnapJobLinkListHead = NULL;
-DWORD gSnapJobSerial = 0;
+#include "fake_pthread_for_win.h"
 #else
 #include <pthread.h>
 #include <time.h>
+#endif
+
 pthread_mutex_t PThreadMutexForSnapJobLinkList;
 typedef struct _SnapJobLinkListElement SnapJobLinkListElement;
 typedef struct _SnapJobLinkListElement
 {
-	SnapJobLinkListElement* pNext;
-	pthread_cond_t PThreadCond;
-	uint8_t* pJEPGBuffer;
-	size_t BufferSize;
-	size_t* pSizeWritten;
-	DWORD CmdSerial;
+    SnapJobLinkListElement* pNext;
+    pthread_cond_t PThreadCond;
+    uint8_t* pJEPGBuffer;
+    size_t BufferSize;
+    size_t* pSizeWritten;
+    DWORD CmdSerial;
 } SnapJobLinkListElement;
 SnapJobLinkListElement* pSnapJobLinkListHead = NULL;
 DWORD gSnapJobSerial = 0;
-#endif
 
-#if (defined _WIN32 || defined _WIN64)
-void AddSnapJobToLinkList(HANDLE hEvent, uint8_t* pJEPGBuffer, size_t BufferSize, size_t* pSizeWritten, DWORD* CmdSerial)
-#else
 void AddSnapJobToLinkList(pthread_cond_t PThreadCond, uint8_t* pJEPGBuffer, size_t BufferSize, size_t* pSizeWritten, DWORD* CmdSerial)
-#endif
 {
-	SnapJobLinkListElement* pTemp = malloc(sizeof(SnapJobLinkListElement));
-	if (NULL != pTemp)
-	{
-		pTemp->pNext = NULL;
-		pTemp->PThreadCond = PThreadCond;
-		pTemp->pJEPGBuffer = pJEPGBuffer;
-		pTemp->BufferSize = BufferSize;
-		pTemp->pSizeWritten = pSizeWritten;
+    SnapJobLinkListElement* pTemp = malloc(sizeof(SnapJobLinkListElement));
+    if (NULL != pTemp)
+    {
+        pTemp->pNext = NULL;
+        pTemp->PThreadCond = PThreadCond;
+        pTemp->pJEPGBuffer = pJEPGBuffer;
+        pTemp->BufferSize = BufferSize;
+        pTemp->pSizeWritten = pSizeWritten;
 
-#if (defined _WIN32 || defined _WIN64)
-		EnterCriticalSection(&CriticalSectionForSnapJobLinkList);
-#else
-		pthread_mutex_lock(&PThreadMutexForSnapJobLinkList);
-#endif
+        pthread_mutex_lock(&PThreadMutexForSnapJobLinkList);
 
-		pTemp->CmdSerial = gSnapJobSerial;
-		*CmdSerial = gSnapJobSerial;
-		gSnapJobSerial++;
+        pTemp->CmdSerial = gSnapJobSerial;
+        *CmdSerial = gSnapJobSerial;
+        gSnapJobSerial++;
 
-		if (NULL == pSnapJobLinkListHead)
-		{
-			pSnapJobLinkListHead = pTemp;
-		}
-		else
-		{
-			SnapJobLinkListElement* pCur = pSnapJobLinkListHead;
-			while (NULL != pCur->pNext)
-			{
-				pCur = pCur->pNext;
-			}
-			pCur->pNext = pTemp;
-		}
+        if (NULL == pSnapJobLinkListHead)
+        {
+            pSnapJobLinkListHead = pTemp;
+        }
+        else
+        {
+            SnapJobLinkListElement* pCur = pSnapJobLinkListHead;
+            while (NULL != pCur->pNext)
+            {
+                pCur = pCur->pNext;
+            }
+            pCur->pNext = pTemp;
+        }
 
-#if (defined _WIN32 || defined _WIN64) 
-		LeaveCriticalSection(&CriticalSectionForSnapJobLinkList);
-#else
-		pthread_mutex_unlock(&PThreadMutexForSnapJobLinkList);
-#endif
-	}
+        pthread_mutex_unlock(&PThreadMutexForSnapJobLinkList);
+    }
 }
 
 void RemoveSnapJobFromLinkList(DWORD CmdSerial)
 {
-	SnapJobLinkListElement* pPrevious;
-	SnapJobLinkListElement* pCurrent;
-	SnapJobLinkListElement* pAfter;
+    SnapJobLinkListElement* pPrevious;
+    SnapJobLinkListElement* pCurrent;
+    SnapJobLinkListElement* pAfter;
 
-#if (defined _WIN32 || defined _WIN64)
-	EnterCriticalSection(&CriticalSectionForSnapJobLinkList);
-#else
-	pthread_mutex_lock(&PThreadMutexForSnapJobLinkList);
-#endif
+    pthread_mutex_lock(&PThreadMutexForSnapJobLinkList);
 
-	if (NULL != pSnapJobLinkListHead)
-	{
-		pPrevious = pSnapJobLinkListHead;
-		pCurrent = pSnapJobLinkListHead;
-		pAfter = pSnapJobLinkListHead->pNext;
+    if (NULL != pSnapJobLinkListHead)
+    {
+        pPrevious = pSnapJobLinkListHead;
+        pCurrent = pSnapJobLinkListHead;
+        pAfter = pSnapJobLinkListHead->pNext;
 
-		while (pCurrent->CmdSerial != CmdSerial && NULL != pCurrent)
-		{
-			if (pCurrent != pSnapJobLinkListHead)
-			{
-				pPrevious = pPrevious->pNext;
-			}
-			pCurrent = pCurrent->pNext;
-			if (NULL != pAfter)
-			{
-				pAfter = pAfter->pNext;
-			}
-		}
+        while (pCurrent->CmdSerial != CmdSerial && NULL != pCurrent)
+        {
+            if (pCurrent != pSnapJobLinkListHead)
+            {
+                pPrevious = pPrevious->pNext;
+            }
+            pCurrent = pCurrent->pNext;
+            if (NULL != pAfter)
+            {
+                pAfter = pAfter->pNext;
+            }
+        }
 
-		if (NULL != pCurrent)
-		{
-			free(pCurrent);
-		}
+        if (NULL != pCurrent)
+        {
+            free(pCurrent);
+        }
 
-		if (pPrevious != pCurrent)
-		{
-			pPrevious->pNext = pAfter;
-		}
-	}
+        if (pPrevious != pCurrent)
+        {
+            pPrevious->pNext = pAfter;
+        }
+    }
 
-#if (defined _WIN32 || defined _WIN64) 
-	LeaveCriticalSection(&CriticalSectionForSnapJobLinkList);
-#else
-	pthread_mutex_unlock(&PThreadMutexForSnapJobLinkList);
-#endif
+    pthread_mutex_unlock(&PThreadMutexForSnapJobLinkList);
 }
 
 void CALLBACK SnapRev(
-		LLONG lLoginID,
-		BYTE *pBuf,
-		UINT RevLen,
-		UINT EncodeType,
-		DWORD CmdSerial,
-		LDWORD dwUser)
+    LLONG lLoginID,
+    BYTE *pBuf,
+    UINT RevLen,
+    UINT EncodeType,
+    DWORD CmdSerial,
+    LDWORD dwUser)
 {
-	SnapJobLinkListElement* pCurrent;
+    SnapJobLinkListElement* pCurrent;
 
-#if (defined _WIN32 || defined _WIN64)
-	EnterCriticalSection(&CriticalSectionForSnapJobLinkList);
-#else
-	pthread_mutex_lock(&PThreadMutexForSnapJobLinkList);
-#endif
+    pthread_mutex_lock(&PThreadMutexForSnapJobLinkList);
 
-	pCurrent = pSnapJobLinkListHead;
+    pCurrent = pSnapJobLinkListHead;
 
-	while (pCurrent->CmdSerial != CmdSerial && NULL != pCurrent)
-	{
-		pCurrent = pCurrent->pNext;
-	}
+    while (pCurrent->CmdSerial != CmdSerial && NULL != pCurrent)
+    {
+        pCurrent = pCurrent->pNext;
+    }
 
-	if (NULL != pCurrent)
-	{
-		if (pCurrent->BufferSize > RevLen)
-		{
-			memcpy(pCurrent->pJEPGBuffer, pBuf, RevLen);
-			*pCurrent->pSizeWritten = RevLen;
-		}
-		else
-		{
-			*pCurrent->pSizeWritten = 0;
-		}
-	}
+    if (NULL != pCurrent)
+    {
+        if (pCurrent->BufferSize > RevLen)
+        {
+            memcpy(pCurrent->pJEPGBuffer, pBuf, RevLen);
+            *pCurrent->pSizeWritten = RevLen;
+        }
+        else
+        {
+            *pCurrent->pSizeWritten = 0;
+        }
+    }
 
-#if (defined _WIN32 || defined _WIN64) 
-	SetEvent(pCurrent->hEvent);
-	LeaveCriticalSection(&CriticalSectionForSnapJobLinkList);
-#else
-	pthread_cond_signal(&pCurrent->PThreadCond);
-	pthread_mutex_unlock(&PThreadMutexForSnapJobLinkList);
-#endif
+    pthread_cond_signal(&pCurrent->PThreadCond);
+    pthread_mutex_unlock(&PThreadMutexForSnapJobLinkList);
 }
 
 //typedef struct _PicSizeIndexSizeTable
@@ -225,366 +184,351 @@ void CALLBACK SnapRev(
 
 UNVDAPI bool UNVD_Initialize()
 {
-	if (!CLIENT_Init(NULL, 0))
-	{
-		return false;
-	}
-	CLIENT_SetSnapRevCallBack(SnapRev, 0);
+    if (!CLIENT_Init(NULL, 0))
+    {
+        return false;
+    }
+    CLIENT_SetSnapRevCallBack(SnapRev, 0);
 
-#if (defined _WIN32 || defined _WIN64)
-	InitializeCriticalSection(&CriticalSectionForSnapJobLinkList);
-#else
-	pthread_mutex_init(&PThreadMutexForSnapJobLinkList,NULL);
-#endif
+    pthread_mutex_init(&PThreadMutexForSnapJobLinkList, NULL);
 
-	return true;
+    return true;
 }
 
 UNVDAPI bool UNVD_CleanUp()
 {
-	CLIENT_Cleanup();
-#if (defined _WIN32 || defined _WIN64)
-	DeleteCriticalSection(&CriticalSectionForSnapJobLinkList);
-#else
-	pthread_mutex_destroy(&PThreadMutexForSnapJobLinkList);
-#endif
-	return true;
+    CLIENT_Cleanup();
+    pthread_mutex_destroy(&PThreadMutexForSnapJobLinkList);
+    return true;
 }
 
 UNVDAPI bool UNVD_Login(
-		IN_PARAM UNVD_LoginInfo* pUNVD_LoginInfo,
-		OUT_PARAM UNVD_LoginHandle* pLoginHandle)
+    IN_PARAM UNVD_LoginInfo* pUNVD_LoginInfo,
+    OUT_PARAM UNVD_LoginHandle* pLoginHandle)
 {
-	*pLoginHandle = NULL;
-	if (NULL == pUNVD_LoginInfo)
-		return false;
-	device_context* pDeviceContext = calloc(1, sizeof(device_context));
-	if (NULL == pDeviceContext)
-		return false;
+    *pLoginHandle = NULL;
+    if (NULL == pUNVD_LoginInfo)
+        return false;
+    device_context* pDeviceContext = calloc(1, sizeof(device_context));
+    if (NULL == pDeviceContext)
+        return false;
 
-	NET_DEVICEINFO DHLoginDevInfo;
-	int errorCode;
-	pDeviceContext->DHLoginHandle = CLIENT_Login(
-			pUNVD_LoginInfo->szDeviceAddress,
-			pUNVD_LoginInfo->port,
-			pUNVD_LoginInfo->szUsername,
-			pUNVD_LoginInfo->szPassword,
-			&DHLoginDevInfo,
-			&errorCode);
-	if (0 == pDeviceContext->DHLoginHandle)
-	{
-		free(pDeviceContext);
-		return false;
-	}
+    NET_DEVICEINFO DHLoginDevInfo;
+    int errorCode;
+    pDeviceContext->DHLoginHandle = CLIENT_Login(
+        pUNVD_LoginInfo->szDeviceAddress,
+        pUNVD_LoginInfo->port,
+        pUNVD_LoginInfo->szUsername,
+        pUNVD_LoginInfo->szPassword,
+        &DHLoginDevInfo,
+        &errorCode);
+    if (0 == pDeviceContext->DHLoginHandle)
+    {
+        free(pDeviceContext);
+        return false;
+    }
 
-	pDeviceContext->CamerasCount = DHLoginDevInfo.byChanNum;
-	pDeviceContext->AnalogCamerasCount = 0;
-	pDeviceContext->IPCamerasCountConnt = 0;
-	pDeviceContext->AnalogCameraStartChannel = 0;
-	pDeviceContext->IPCameraStartChannel = 0;
+    pDeviceContext->CamerasCount = DHLoginDevInfo.byChanNum;
+    pDeviceContext->AnalogCamerasCount = 0;
+    pDeviceContext->IPCamerasCountConnt = 0;
+    pDeviceContext->AnalogCameraStartChannel = 0;
+    pDeviceContext->IPCameraStartChannel = 0;
 
-	NET_DEV_CHN_COUNT_INFO DHDevChnCountInfo;
+    NET_DEV_CHN_COUNT_INFO DHDevChnCountInfo;
 
-	BOOL ret = CLIENT_QueryDevState(
-			pDeviceContext->DHLoginHandle,
-			DH_DEVSTATE_DEV_CHN_COUNT,
-			(char*)&DHDevChnCountInfo,
-			sizeof(NET_DEV_CHN_COUNT_INFO),
-			&errorCode,
-			1000);
-	if (ret)
-	{
-		pDeviceContext->CamerasCount = MAX(DHDevChnCountInfo.stuVideoIn.nMaxTotal, DHLoginDevInfo.byChanNum);
-	}
+    BOOL ret = CLIENT_QueryDevState(
+        pDeviceContext->DHLoginHandle,
+        DH_DEVSTATE_DEV_CHN_COUNT,
+        (char*)&DHDevChnCountInfo,
+        sizeof(NET_DEV_CHN_COUNT_INFO),
+        &errorCode,
+        1000);
+    if (ret)
+    {
+        pDeviceContext->CamerasCount = MAX(DHDevChnCountInfo.stuVideoIn.nMaxTotal, DHLoginDevInfo.byChanNum);
+    }
 
-	//DH_DEV_ENABLE_INFO DHDevEnableInfo;
+    //DH_DEV_ENABLE_INFO DHDevEnableInfo;
 
-	//ret = CLIENT_QuerySystemInfo(
-	//    pDeviceContext->DHLoginHandle,
-	//    ABILITY_DEVALL_INFO,
-	//    (char*)&DHDevEnableInfo,
-	//    sizeof(DH_DEV_ENABLE_INFO),
-	//    &errorCode,
-	//    1000);
-	//if (ret)
-	//{
-	//    pDeviceContext->bJSON = DHDevEnableInfo.IsFucEnable[EN_JSON_CONFIG] & 0x01;
-	//}
-	//else
-	//{
-	//    pDeviceContext->bJSON = false;
-	//}
+    //ret = CLIENT_QuerySystemInfo(
+    //    pDeviceContext->DHLoginHandle,
+    //    ABILITY_DEVALL_INFO,
+    //    (char*)&DHDevEnableInfo,
+    //    sizeof(DH_DEV_ENABLE_INFO),
+    //    &errorCode,
+    //    1000);
+    //if (ret)
+    //{
+    //    pDeviceContext->bJSON = DHDevEnableInfo.IsFucEnable[EN_JSON_CONFIG] & 0x01;
+    //}
+    //else
+    //{
+    //    pDeviceContext->bJSON = false;
+    //}
 
-	//if (pDeviceContext->CamerasCount > 0)
-	//{
-	//    if (pDeviceContext->bJSON)
-	//    {
-	//        pDeviceContext->pCfgSnapCapInfo = malloc(pDeviceContext->CamerasCount * sizeof(CFG_SNAPCAPINFO_INFO));
-	//        if (NULL == pDeviceContext->pCfgSnapCapInfo)
-	//        {
-	//            UNVD_Logout(&pDeviceContext);
-	//            return false;
-	//        }
-	//    }
-	//    else
-	//    {
-	//        pDeviceContext->pDevSnapCfg = malloc(pDeviceContext->CamerasCount * sizeof(DHDEV_SNAP_CFG));
-	//        if (NULL == pDeviceContext->pDevSnapCfg)
-	//        {
-	//            UNVD_Logout(&pDeviceContext);
-	//            return false;
-	//        }
-	//    }
-	//}
+    //if (pDeviceContext->CamerasCount > 0)
+    //{
+    //    if (pDeviceContext->bJSON)
+    //    {
+    //        pDeviceContext->pCfgSnapCapInfo = malloc(pDeviceContext->CamerasCount * sizeof(CFG_SNAPCAPINFO_INFO));
+    //        if (NULL == pDeviceContext->pCfgSnapCapInfo)
+    //        {
+    //            UNVD_Logout(&pDeviceContext);
+    //            return false;
+    //        }
+    //    }
+    //    else
+    //    {
+    //        pDeviceContext->pDevSnapCfg = malloc(pDeviceContext->CamerasCount * sizeof(DHDEV_SNAP_CFG));
+    //        if (NULL == pDeviceContext->pDevSnapCfg)
+    //        {
+    //            UNVD_Logout(&pDeviceContext);
+    //            return false;
+    //        }
+    //    }
+    //}
 
-	//if (pDeviceContext->bJSON)
-	//{
-	//    uint32_t JSONBufferSize = 100 * 1024;
-	//    char* pJSONBuffer = malloc(JSONBufferSize);
-	//    if (pJSONBuffer)
-	//    {
-	//        for (size_t i = 0; i < pDeviceContext->CamerasCount; i++)
-	//        {
-	//            ret = CLIENT_GetNewDevConfig(
-	//                pDeviceContext->DHLoginHandle,
-	//                CFG_CMD_SNAPCAPINFO,
-	//                i,
-	//                pJSONBuffer,
-	//                JSONBufferSize,
-	//                &errorCode,
-	//                500);
-	//            if (!ret)
-	//            {
-	//                pDeviceContext->pCfgSnapCapInfo[i].nChannelID = -1;
-	//            }
-	//            else
-	//            {
-	//                ret = CLIENT_ParseData(
-	//                    CFG_CMD_SNAPCAPINFO,
-	//                    pJSONBuffer,
-	//                    &pDeviceContext->pCfgSnapCapInfo[i],
-	//                    sizeof(CFG_SNAPCAPINFO_INFO),
-	//                    NULL);
-	//                if (!ret)
-	//                {
-	//                    pDeviceContext->pCfgSnapCapInfo[i].nChannelID = -1;
-	//                }
-	//            }
-	//        }
-	//        free(pJSONBuffer);
-	//    }
-	//    else
-	//    {
-	//        for (size_t i = 0; i < pDeviceContext->CamerasCount; i++)
-	//        {
-	//            pDeviceContext->pCfgSnapCapInfo[i].nChannelID = -1;
-	//        }
-	//    }
-	//}
-	//else
-	//{
-	//    for (size_t i = 0; i < pDeviceContext->CamerasCount; i++)
-	//    {
-	//        ret = CLIENT_GetDevConfig(
-	//            pDeviceContext->DHLoginHandle,
-	//            DH_DEV_SNAP_CFG,
-	//            i,
-	//            &pDeviceContext->pDevSnapCfg[i],
-	//            sizeof(DHDEV_SNAP_CFG),
-	//            &errorCode,
-	//            500);
-	//        if (!ret)
-	//        {
-	//            pDeviceContext->pDevSnapCfg[i].dwSize = 0;
-	//        }
-	//    }
-	//}
+    //if (pDeviceContext->bJSON)
+    //{
+    //    uint32_t JSONBufferSize = 100 * 1024;
+    //    char* pJSONBuffer = malloc(JSONBufferSize);
+    //    if (pJSONBuffer)
+    //    {
+    //        for (size_t i = 0; i < pDeviceContext->CamerasCount; i++)
+    //        {
+    //            ret = CLIENT_GetNewDevConfig(
+    //                pDeviceContext->DHLoginHandle,
+    //                CFG_CMD_SNAPCAPINFO,
+    //                i,
+    //                pJSONBuffer,
+    //                JSONBufferSize,
+    //                &errorCode,
+    //                500);
+    //            if (!ret)
+    //            {
+    //                pDeviceContext->pCfgSnapCapInfo[i].nChannelID = -1;
+    //            }
+    //            else
+    //            {
+    //                ret = CLIENT_ParseData(
+    //                    CFG_CMD_SNAPCAPINFO,
+    //                    pJSONBuffer,
+    //                    &pDeviceContext->pCfgSnapCapInfo[i],
+    //                    sizeof(CFG_SNAPCAPINFO_INFO),
+    //                    NULL);
+    //                if (!ret)
+    //                {
+    //                    pDeviceContext->pCfgSnapCapInfo[i].nChannelID = -1;
+    //                }
+    //            }
+    //        }
+    //        free(pJSONBuffer);
+    //    }
+    //    else
+    //    {
+    //        for (size_t i = 0; i < pDeviceContext->CamerasCount; i++)
+    //        {
+    //            pDeviceContext->pCfgSnapCapInfo[i].nChannelID = -1;
+    //        }
+    //    }
+    //}
+    //else
+    //{
+    //    for (size_t i = 0; i < pDeviceContext->CamerasCount; i++)
+    //    {
+    //        ret = CLIENT_GetDevConfig(
+    //            pDeviceContext->DHLoginHandle,
+    //            DH_DEV_SNAP_CFG,
+    //            i,
+    //            &pDeviceContext->pDevSnapCfg[i],
+    //            sizeof(DHDEV_SNAP_CFG),
+    //            &errorCode,
+    //            500);
+    //        if (!ret)
+    //        {
+    //            pDeviceContext->pDevSnapCfg[i].dwSize = 0;
+    //        }
+    //    }
+    //}
 
-	*pLoginHandle = pDeviceContext;
-	return true;
+    *pLoginHandle = pDeviceContext;
+    return true;
 }
 
 UNVDAPI bool UNVD_Logout(IN_PARAM UNVD_LoginHandle* pLoginHandle)
 {
-	if (NULL == pLoginHandle)
-		return false;
-	if (NULL == *pLoginHandle)
-		return false;
-	device_context* pDeviceContext = *pLoginHandle;
-	BOOL ret = CLIENT_Logout(pDeviceContext->DHLoginHandle);
-	if (ret)
-	{
-		free(pDeviceContext->pCfgSnapCapInfo);
-		free(pDeviceContext->pDevSnapCfg);
-		free(pDeviceContext);
-		*pLoginHandle = NULL;
-		return true;
-	}
-	else
-	{
-		return false;
-	}
+    if (NULL == pLoginHandle)
+        return false;
+    if (NULL == *pLoginHandle)
+        return false;
+    device_context* pDeviceContext = *pLoginHandle;
+    BOOL ret = CLIENT_Logout(pDeviceContext->DHLoginHandle);
+    if (ret)
+    {
+        free(pDeviceContext->pCfgSnapCapInfo);
+        free(pDeviceContext->pDevSnapCfg);
+        free(pDeviceContext);
+        *pLoginHandle = NULL;
+        return true;
+    }
+    else
+    {
+        return false;
+    }
 }
 
 UNVDAPI bool UNVD_GetVideoSourceCount(
-		IN_PARAM UNVD_LoginHandle LoginHandle,
-		OUT_PARAM size_t* pCount)
+    IN_PARAM UNVD_LoginHandle LoginHandle,
+    OUT_PARAM size_t* pCount)
 {
-	if (NULL == LoginHandle)
-	{
-		return false;
-	}
-	device_context* pDeviceContext = LoginHandle;
-	*pCount = pDeviceContext->CamerasCount;
+    if (NULL == LoginHandle)
+    {
+        return false;
+    }
+    device_context* pDeviceContext = LoginHandle;
+    *pCount = pDeviceContext->CamerasCount;
 
-	return true;
+    return true;
 }
 
 UNVDAPI bool UNVD_GetSnapshotData(
-		IN_PARAM UNVD_LoginHandle LoginHandle,
-		IN_PARAM size_t VideoSourceIndex,
-		OUT_PARAM uint8_t* pJEPGBuffer,
-		IN_PARAM size_t BufferSize,
-		OUT_PARAM size_t* pSizeWritten)
+    IN_PARAM UNVD_LoginHandle LoginHandle,
+    IN_PARAM size_t VideoSourceIndex,
+    OUT_PARAM uint8_t* pJEPGBuffer,
+    IN_PARAM size_t BufferSize,
+    OUT_PARAM size_t* pSizeWritten)
 {
-	*pSizeWritten = 0;
+    *pSizeWritten = 0;
 
-	if (NULL == LoginHandle || NULL == pJEPGBuffer || NULL == pSizeWritten)
-	{
-		return false;
-	}
-	device_context* pDeviceContext = LoginHandle;
+    if (NULL == LoginHandle || NULL == pJEPGBuffer || NULL == pSizeWritten)
+    {
+        return false;
+    }
+    device_context* pDeviceContext = LoginHandle;
 
-	SNAP_PARAMS SnapParams;
+    SNAP_PARAMS SnapParams;
 
-	SnapParams.Channel = VideoSourceIndex;
+    SnapParams.Channel = VideoSourceIndex;
 
-	// get best quality
+    // get best quality
 
-	//uint32_t BestQuality;
+    //uint32_t BestQuality;
 
-	//if (pDeviceContext->bJSON)
-	//{
-	//    CFG_SNAPCAPINFO_INFO* pCfgSnapCapInfo = &pDeviceContext->pCfgSnapCapInfo[VideoSourceIndex];
-	//    if (-1 != pCfgSnapCapInfo->nChannelID)
-	//    {
-	//        BestQuality = 1;
-	//        for (DWORD i = 0; i < pCfgSnapCapInfo->dwQualityMun; i++)
-	//        {
-	//            if (pCfgSnapCapInfo->emQualityList[i] > BestQuality)
-	//            {
-	//                BestQuality = pCfgSnapCapInfo->emQualityList[i];
-	//            }
-	//        }
-	//    }
-	//    else
-	//    {
-	//        BestQuality = 6;
-	//    }
-	//}
-	//else
-	//{
-	//    DHDEV_SNAP_CFG* pDevSnapCfg = &pDeviceContext->pDevSnapCfg[VideoSourceIndex];
-	//    if (1 == pDevSnapCfg->struSnapEnc[0].byImageQltyType)
-	//    {
-	//        BestQuality = 6;
-	//    }
-	//    else
-	//    {
-	//        BestQuality = pDevSnapCfg->struSnapEnc[0].byImageQlty;
-	//    }
-	//}
+    //if (pDeviceContext->bJSON)
+    //{
+    //    CFG_SNAPCAPINFO_INFO* pCfgSnapCapInfo = &pDeviceContext->pCfgSnapCapInfo[VideoSourceIndex];
+    //    if (-1 != pCfgSnapCapInfo->nChannelID)
+    //    {
+    //        BestQuality = 1;
+    //        for (DWORD i = 0; i < pCfgSnapCapInfo->dwQualityMun; i++)
+    //        {
+    //            if (pCfgSnapCapInfo->emQualityList[i] > BestQuality)
+    //            {
+    //                BestQuality = pCfgSnapCapInfo->emQualityList[i];
+    //            }
+    //        }
+    //    }
+    //    else
+    //    {
+    //        BestQuality = 6;
+    //    }
+    //}
+    //else
+    //{
+    //    DHDEV_SNAP_CFG* pDevSnapCfg = &pDeviceContext->pDevSnapCfg[VideoSourceIndex];
+    //    if (1 == pDevSnapCfg->struSnapEnc[0].byImageQltyType)
+    //    {
+    //        BestQuality = 6;
+    //    }
+    //    else
+    //    {
+    //        BestQuality = pDevSnapCfg->struSnapEnc[0].byImageQlty;
+    //    }
+    //}
 
-	//SnapParams.Quality = BestQuality;
+    //SnapParams.Quality = BestQuality;
 
-	SnapParams.Quality = 6;
-	// get largest pic
+    SnapParams.Quality = 6;
+    // get largest pic
 
-	//uint32_t LargestSize;
+    //uint32_t LargestSize;
 
-	//if (pDeviceContext->bJSON)
-	//{
-	//    CFG_SNAPCAPINFO_INFO* pCfgSnapCapInfo = &pDeviceContext->pCfgSnapCapInfo[VideoSourceIndex];
-	//    if (-1 != pCfgSnapCapInfo->nChannelID)
-	//    {
-	//        LargestSize = 0;
-	//        for (DWORD i = 0; i < pCfgSnapCapInfo->dwIMageSizeNum; i++)
-	//        {
-	//            if (pCfgSnapCapInfo->emIMageSizeList[i] >= IMAGE_SIZE_NR)
-	//            {
-	//                continue;
-	//            }
-	//            if (StaticPicSizeIndexSizeTable[pCfgSnapCapInfo->emIMageSizeList[i]].PicSize>StaticPicSizeIndexSizeTable[LargestSize].PicSize)
-	//            {
-	//                LargestSize = pCfgSnapCapInfo->emIMageSizeList[i];
-	//            }
-	//        }
-	//    }
-	//    else
-	//    {
-	//        LargestSize = 0;
-	//    }
-	//}
-	//else
-	//{
-	//    LargestSize = 2;
-	//}
+    //if (pDeviceContext->bJSON)
+    //{
+    //    CFG_SNAPCAPINFO_INFO* pCfgSnapCapInfo = &pDeviceContext->pCfgSnapCapInfo[VideoSourceIndex];
+    //    if (-1 != pCfgSnapCapInfo->nChannelID)
+    //    {
+    //        LargestSize = 0;
+    //        for (DWORD i = 0; i < pCfgSnapCapInfo->dwIMageSizeNum; i++)
+    //        {
+    //            if (pCfgSnapCapInfo->emIMageSizeList[i] >= IMAGE_SIZE_NR)
+    //            {
+    //                continue;
+    //            }
+    //            if (StaticPicSizeIndexSizeTable[pCfgSnapCapInfo->emIMageSizeList[i]].PicSize>StaticPicSizeIndexSizeTable[LargestSize].PicSize)
+    //            {
+    //                LargestSize = pCfgSnapCapInfo->emIMageSizeList[i];
+    //            }
+    //        }
+    //    }
+    //    else
+    //    {
+    //        LargestSize = 0;
+    //    }
+    //}
+    //else
+    //{
+    //    LargestSize = 2;
+    //}
 
-	//SnapParams.ImageSize = LargestSize;
+    //SnapParams.ImageSize = LargestSize;
 
-	SnapParams.ImageSize = 0;
-	SnapParams.mode = 0;
+    SnapParams.ImageSize = 0;
+    SnapParams.mode = 0;
 
-#if (defined _WIN32 || defined _WIN64)
-	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if (NULL == hEvent)
-	{
-		return false;
-	}
-	// add to link list, give out cmdserial
-	AddSnapJobToLinkList(hEvent, pJEPGBuffer, BufferSize, pSizeWritten, &SnapParams.CmdSerial);
-#else
-	pthread_cond_t PThreadCond;
-	if (0!=pthread_cond_init(&PThreadCond,NULL))
-	{
-		return false;
-	}
-	AddSnapJobToLinkList(PThreadCond,pJEPGBuffer,BufferSize,pSizeWritten,&SnapParams.CmdSerial);
-#endif
+    pthread_cond_t PThreadCond;
+    if (0 != pthread_cond_init(&PThreadCond, NULL))
+    {
+        return false;
+    }
+    AddSnapJobToLinkList(PThreadCond, pJEPGBuffer, BufferSize, pSizeWritten, &SnapParams.CmdSerial);
 
-			BOOL ret = CLIENT_SnapPictureEx(
-				pDeviceContext->DHLoginHandle,
-				&SnapParams,
-				NULL);
-			if (ret)
-			{
-#if (defined _WIN32 || defined _WIN64)
-			WaitForSingleObject(hEvent, 1000);
-#else
-			pthread_mutex_t temp;
-			pthread_mutex_init(&temp,NULL);
-			pthread_mutex_lock(&temp);
-			    struct timespec weakuptime;
-			    timespec_get(&weakuptime,TIME_UTC);
-				weakuptime.tv_sec+=1;
-                pthread_cond_timedwait(&PThreadCond,&temp,&weakuptime);
-                pthread_mutex_unlock(&temp);
-                pthread_mutex_destroy(&temp);
-#endif
-			}
+    BOOL ret = CLIENT_SnapPictureEx(
+        pDeviceContext->DHLoginHandle,
+        &SnapParams,
+        NULL);
+    if (ret)
+    {
+        pthread_mutex_t temp;
+        struct timespec weakuptime;
 
 #if (defined _WIN32 || defined _WIN64)
-			RemoveSnapJobFromLinkList(SnapParams.CmdSerial);
-			CloseHandle(hEvent);
+        weakuptime.tv_nsec = 0;
+        weakuptime.tv_sec = 1;
 #else
-            RemoveSnapJobFromLinkList(SnapParams.CmdSerial);
-			pthread_cond_destroy(&PThreadCond);
+        pthread_mutex_init(&temp, NULL);
+        pthread_mutex_lock(&temp);
+        struct timespec weakuptime;
+        timespec_get(&weakuptime, TIME_UTC);
+        weakuptime.tv_sec += 1;
 #endif
-			if (ret && *pSizeWritten != 0)
-			{
-				return true;
-			}
+        pthread_cond_timedwait(&PThreadCond, &temp, &weakuptime);
 
-			return false;
+#if (defined _WIN32 || defined _WIN64)
+#else
+        pthread_mutex_unlock(&temp);
+        pthread_mutex_destroy(&temp);
+#endif
+    }
+
+    RemoveSnapJobFromLinkList(SnapParams.CmdSerial);
+    pthread_cond_destroy(&PThreadCond);
+
+    if (ret && *pSizeWritten != 0)
+    {
+        return true;
+    }
+
+    return false;
 }
 

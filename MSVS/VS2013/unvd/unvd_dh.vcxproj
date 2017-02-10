@@ -81,9 +81,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\unvd_dh\dh_device_context.h" />
+    <ClInclude Include="..\..\..\unvd_dh\fake_pthread_for_win.h" />
     <ClInclude Include="..\..\..\unvd_dh\unvd_dh.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\unvd_dh\fake_pthread_for_win.c" />
     <ClCompile Include="..\..\..\unvd_dh\unvd_dh.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
