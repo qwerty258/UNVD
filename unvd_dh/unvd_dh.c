@@ -76,7 +76,7 @@ void RemoveSnapJobFromLinkList(DWORD CmdSerial)
         pCurrent = pSnapJobLinkListHead;
         pAfter = pSnapJobLinkListHead->pNext;
 
-        while (pCurrent->CmdSerial != CmdSerial && NULL != pCurrent)
+        while (NULL != pCurrent && pCurrent->CmdSerial != CmdSerial)
         {
             if (pCurrent != pSnapJobLinkListHead)
             {
@@ -98,6 +98,10 @@ void RemoveSnapJobFromLinkList(DWORD CmdSerial)
         {
             pPrevious->pNext = pAfter;
         }
+        else
+        {
+            pSnapJobLinkListHead = pAfter;
+        }
     }
 
     pthread_mutex_unlock(&PThreadMutexForSnapJobLinkList);
@@ -115,9 +119,15 @@ void CALLBACK SnapRev(
 
     pthread_mutex_lock(&PThreadMutexForSnapJobLinkList);
 
+    if (NULL == pSnapJobLinkListHead)
+    {
+        pthread_mutex_unlock(&PThreadMutexForSnapJobLinkList);
+        return;
+    }
+
     pCurrent = pSnapJobLinkListHead;
 
-    while (pCurrent->CmdSerial != CmdSerial && NULL != pCurrent)
+    while (NULL != pCurrent && pCurrent->CmdSerial != CmdSerial)
     {
         pCurrent = pCurrent->pNext;
     }
@@ -188,6 +198,7 @@ UNVDAPI bool UNVD_Initialize()
     {
         return false;
     }
+    CLIENT_SetConnectTime(5000, 0);
     CLIENT_SetSnapRevCallBack(SnapRev, 0);
 
     pthread_mutex_init(&PThreadMutexForSnapJobLinkList, NULL);
