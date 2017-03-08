@@ -140,7 +140,7 @@ UNVDAPI bool UNVD_GetSnapshotData(
         pDeviceContext->DHLoginHandle,
         &pInParam,
         &pOutParam,
-        1000);
+        5000);
     if (ret)
     {
         *pSizeWritten = pOutParam.dwPicBufRetLen;
