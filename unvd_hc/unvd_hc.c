@@ -124,22 +124,6 @@ UNVDAPI bool UNVD_Login(
         }
     }
 
-    for (size_t i = 0; i < pDeviceContext->AnalogCamerasCount; i++)
-    {
-        uint32_t ChannelNum = pDeviceContext->AnalogCameraStartChannel + i;
-        BOOL ret = NET_DVR_GetDeviceAbility(
-            pDeviceContext->HikLoginHandle,
-            PIC_CAPTURE_ABILITY,
-            (char*)&ChannelNum,
-            sizeof(uint32_t),
-            (char*)&pDeviceContext->pHikCompressioncfgAbilityArray[i],
-            sizeof(NET_DVR_COMPRESSIONCFG_ABILITY));
-        if (!ret)
-        {
-            pDeviceContext->pHikCompressioncfgAbilityArray[i].dwAbilityNum = 0;
-        }
-    }
-
     *pLoginHandle = pDeviceContext;
     return true;
 }
@@ -202,52 +186,17 @@ UNVDAPI bool UNVD_GetSnapshotData(
     else if (pDeviceContext->AnalogCamerasCount <= VideoSourceIndex &&
         VideoSourceIndex < pDeviceContext->IPCamerasCountConnt + pDeviceContext->AnalogCamerasCount)
     {
-        RealVideoSourceIndex = pDeviceContext->IPCameraStartChannel + VideoSourceIndex - pDeviceContext->AnalogCameraStartChannel;
+        RealVideoSourceIndex = pDeviceContext->IPCameraStartChannel + VideoSourceIndex - pDeviceContext->AnalogCamerasCount;
     }
     else
     {
         return false;
     }
 
-    // get largest pic size
-    uint16_t BestPicSize = 0;
-
-    // 
-    if (VideoSourceIndex < pDeviceContext->AnalogCamerasCount)
-    {
-        NET_DVR_COMPRESSIONCFG_ABILITY* pCompressionAbility = &pDeviceContext->pHikCompressioncfgAbilityArray[VideoSourceIndex];
-        for (DWORD i = 0; i < pCompressionAbility->dwAbilityNum; i++)
-        {
-            if (MAIN_RESOLUTION_ABILITY != pCompressionAbility->struAbilityNode[i].dwAbilityType)
-            {
-                continue;
-            }
-
-            NET_DVR_ABILITY_LIST* pAbilityList = &pCompressionAbility->struAbilityNode[i];
-
-            for (DWORD j = 0; j < pAbilityList->dwNodeNum; j++)
-            {
-                if (pAbilityList->struDescNode[j].iValue < 0 || pAbilityList->struDescNode[j].iValue > StaticPicSizeIndexSizeTableMax)
-                {
-                    continue;
-                }
-
-                if (StaticPicSizeIndexSizeTable[pAbilityList->struDescNode[j].iValue].PicSize > StaticPicSizeIndexSizeTable[BestPicSize].PicSize)
-                {
-                    BestPicSize = pAbilityList->struDescNode[j].iValue;
-                }
-            }
-        }
-    }
-    else
-    {
-        BestPicSize = 0xFF;
-    }
-
     NET_DVR_JPEGPARA JPEGPara = { 0 };
 
     JPEGPara.wPicQuality = 0;
-    JPEGPara.wPicSize = BestPicSize;
+    JPEGPara.wPicSize = 0xFF;
 
     DWORD SizeReturned;
 
@@ -264,6 +213,26 @@ UNVDAPI bool UNVD_GetSnapshotData(
         {
             *pSizeWritten = SizeReturned;
             return true;
+        }
+    }
+    // if auto size failed, for maximum compatibility, use CIF (0)
+    else
+    {
+        JPEGPara.wPicSize = 0;
+        ret = NET_DVR_CaptureJPEGPicture_NEW(
+            pDeviceContext->HikLoginHandle,
+            RealVideoSourceIndex,
+            &JPEGPara,
+            pJEPGBuffer,
+            BufferSize,
+            &SizeReturned);
+        if (ret)
+        {
+            if (SizeReturned <= BufferSize)
+            {
+                *pSizeWritten = SizeReturned;
+                return true;
+            }
         }
     }
 
