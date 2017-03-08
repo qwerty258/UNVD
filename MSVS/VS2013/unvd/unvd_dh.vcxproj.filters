@@ -21,15 +21,9 @@
     <ClInclude Include="..\..\..\unvd_dh\unvd_dh.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\unvd_dh\fake_pthread_for_win.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\unvd_dh\unvd_dh.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\unvd_dh\fake_pthread_for_win.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
